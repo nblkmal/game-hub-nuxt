@@ -145,8 +145,7 @@ function getEndOptions(start: string): string[] {
 const bookingItemSchema = v.pipe(
   v.object({
     resource: v.pipe(v.string(), v.minLength(1, 'Choose a game')),
-    resourceUnit: v.pipe(v.string(), v.minLength(1, 'Choose a unit')),
-    multipleResourceUnit: v.pipe(v.array(v.string()), v.minLength(1, 'Choose a unit')),
+    resourceUnit: v.pipe(v.array(v.string()), v.minLength(1, 'Please select at least one unit')),
     date: v.pipe(v.string(), v.minLength(1, 'Choose a date')),
     startTime: v.pipe(v.string(), v.minLength(1, 'Choose a start time')),
     endTime: v.pipe(v.string(), v.minLength(1, 'Choose an end time'))
@@ -158,8 +157,9 @@ const bookingItemSchema = v.pipe(
 )
 
 const schema = v.object({
+  name: v.pipe(v.string(), v.minLength(1, 'Name is required')),
+  phone: v.pipe(v.string(), v.minLength(1, 'Phone is required')),
   email: v.pipe(v.string(), v.email('Invalid email')),
-  password: v.pipe(v.string(), v.minLength(8, 'Must be at least 8 characters')),
   bookings: v.pipe(
     v.array(bookingItemSchema),
     v.minLength(1, 'Add at least one booking')
@@ -170,19 +170,18 @@ type Schema = v.InferOutput<typeof schema>
 
 type Booking = {
   resource: string
-  resourceUnit: string
-  multipleResourceUnit: string[]
+  resourceUnit: string[]
   date: string
   startTime: string
   endTime: string
 }
 
 const state = reactive({
-  name: '',
-  phone: '',
-  email: '',
+  name: 'akmal',
+  phone: '0123456789',
+  email: 'akmal@gmail.com',
   bookings: [
-    { resource: '', resourceUnit: '', multipleResourceUnit: [], date: new Date().toISOString().split('T')[0], startTime: '', endTime: '' } as Booking
+    { resource: '', resourceUnit: [], date: new Date().toISOString().split('T')[0], startTime: '', endTime: '' } as Booking
   ],
   
 })
@@ -194,14 +193,8 @@ watch(
     newResources.forEach((resource, index) => {
       if (!resource) return
       if (resource !== oldResources?.[index]) {
-        if (resource === 'playstation-5') {
-          state.bookings[index].resourceUnit = ''
-          state.bookings[index].multipleResourceUnit = []
-        } else {
-          state.bookings[index].multipleResourceUnit = []
-          const firstUnit = (resourcesUnit.value?.[0] as string | undefined) || ''
-          state.bookings[index].resourceUnit = firstUnit
-        }
+        // Reset resourceUnit array when resource changes
+        state.bookings[index].resourceUnit = []
       }
     })
   }
@@ -224,14 +217,24 @@ watch(
 
 const toast = useToast()
 async function onSubmit(event: FormSubmitEvent<Schema>) {
-  toast.add({ title: 'Success', description: 'The form has been submitted.', color: 'success' })
-  console.log(event.data)
+  try {
+    const res = await $fetch('https://nginx.slotify.orb.local/api/bookings', {
+      method: 'POST',
+      body: event.data
+    })
+
+    console.log('API response:', res)
+    toast.add({ title: 'Booking created', description: 'Booking created successfully', color: 'success' })
+  } catch (err: any) {
+    console.error('API error:', err)
+    toast.add({ title: 'Error', description: err.message, color: 'error' })
+  }
 }
 
 const stepper = useTemplateRef('stepper')
 
 function addBooking() {
-  state.bookings.push({ resource: '', resourceUnit: '', multipleResourceUnit: [], date: new Date().toISOString().split('T')[0], startTime: '', endTime: '' })
+  state.bookings.push({ resource: '', resourceUnit: [], date: new Date().toISOString().split('T')[0], startTime: '', endTime: '' })
 }
 
 function removeBooking(index: number) {
@@ -247,10 +250,10 @@ onMounted(() => {
 })
 
 async function getResources() {
-  fetchingResources.value = true
-  const { data, pending, error } = await useFetch('https://nginx.slotify.orb.local/api/resources')
-  fetchingResources.value = false
-  testResources.value = data.value
+  // fetchingResources.value = true
+  // const { data, pending, error } = await useFetch('https://nginx.slotify.orb.local/api/resources')
+  // fetchingResources.value = false
+  // testResources.value = data.value
 }
 
 </script>
@@ -282,40 +285,20 @@ async function getResources() {
                   />
                 </UFormField>
 
-                <UFormField v-if="booking.resource !== 'playstation-5'" :label="`Unit`" :name="`bookings.${index}.resourceUnit`">
-                  <URadioGroup
-                    v-model="booking.resourceUnit"
-                    :ui="{ fieldset: 'sm:flex-col md:flex-row w-full', item: 'w-full bg-neutral-600' }"
-                    indicator="hidden"
-                    variant="card"
-                    :items="resourcesUnit"
-                    class="w-full "
-                  >
-                    <template #label="{ item }">
-                      <div class="flex justify-center">
-                        <div class="flex items-center gap-2">
-                          <UIcon name="i-lucide-toy-brick" />
-                          <span>{{ item.label }}</span>
-                        </div>
-                      </div>
-                    </template>
-                  </URadioGroup>
-                </UFormField>
-
-                <UFormField v-else :label="`Sim Racing Slot`" :name="`bookings.${index}.multipleResourceUnit`">
+                <UFormField :label="`Unit`" :name="`bookings.${index}.resourceUnit`">
                   <UCheckboxGroup
+                    v-model="booking.resourceUnit"
                     color="primary"
                     indicator="hidden"
                     :ui="{ fieldset: 'sm:flex-col md:flex-row w-full grid grid-cols-5 gap-2', item: 'w-full bg-neutral-600' }"
-                    v-model="booking.multipleResourceUnit"
                     variant="card"
-                    :items="resourcesUnitPlaystation"
+                    :items="booking.resource === 'playstation-5' ? resourcesUnitPlaystation : resourcesUnit"
                     class="w-full"
                   >
                     <template #label="{ item }">
                       <div class="flex justify-center">
                         <div class="flex items-center gap-2">
-                          <UIcon name="i-lucide-joystick" />
+                          <UIcon :name="booking.resource === 'playstation-5' ? 'i-lucide-joystick' : 'i-lucide-toy-brick'" />
                           <span>{{ item.label }}</span>
                         </div>
                       </div>
@@ -371,10 +354,9 @@ async function getResources() {
                       <span>{{ booking.startTime }} - {{ booking.endTime }}</span>
                     </div>
                     <div class="flex items-center gap-2">
-                      <div v-if="booking.resource === 'playstation-5'" class="flex flex-wrap gap-2">
-                        <UBadge v-for="unit in booking.multipleResourceUnit" :key="unit" color="neutral" variant="subtle">{{ unit }}</UBadge>
+                      <div class="flex flex-wrap gap-2">
+                        <UBadge v-for="unit in booking.resourceUnit" :key="unit" color="neutral" variant="subtle">{{ unit }}</UBadge>
                       </div>
-                      <UBadge v-else color="neutral" variant="subtle">{{ booking.resourceUnit }}</UBadge>
                     </div>
                   </div>
                 </div>
@@ -396,34 +378,41 @@ async function getResources() {
               </div>
             </div>
 
-            <div class="w-full flex justify-end mt-4">
-              <UButton type="submit" color="primary" icon="i-lucide-rocket" :disabled="state.bookings.length === 1 && state.bookings[0].resource === ''">
-                Confirm Booking
-              </UButton>
-            </div>
           </UCard>
         </template>
       </UStepper>
 
       <div class="flex gap-2 justify-between mt-4">
-      <UButton
-        leading-icon="i-lucide-arrow-left"
-        :disabled="!stepper?.hasPrev"
-        @click="stepper?.prev()"
-        variant="neutral"
-      >
-        Prev
-      </UButton>
+        <UButton
+          leading-icon="i-lucide-arrow-left"
+          :disabled="!stepper?.hasPrev"
+          @click="stepper?.prev()"
+          variant="neutral"
+        >
+          Prev
+        </UButton>
 
-      <UButton
-        trailing-icon="i-lucide-arrow-right"
-        :disabled="!stepper?.hasNext"
-        @click="stepper?.next()"
-        variant="neutral"
-      >
-        Next
-      </UButton>
-    </div>
+        <UButton
+          trailing-icon="i-lucide-arrow-right"
+          :disabled="!stepper?.hasNext"
+          @click="stepper?.next()"
+          variant="neutral"
+        >
+          Next
+        </UButton>
+      </div>
+
+      <!-- Submit button outside stepper -->
+      <div class="flex justify-end mt-4">
+        <UButton 
+          type="submit" 
+          color="primary" 
+          icon="i-lucide-rocket" 
+          :disabled="state.bookings.length === 1 && state.bookings[0].resource === ''"
+        >
+          Confirm Booking
+        </UButton>
+      </div>
     </UForm>
   </div>
 </template>

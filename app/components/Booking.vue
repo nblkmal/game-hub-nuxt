@@ -239,6 +239,20 @@ function removeBooking(index: number) {
   state.bookings.splice(index, 1)
 }
 
+const fetchingResources = ref(false)
+const testResources = ref([])
+// onMounted, call api health
+onMounted(() => {
+  getResources()
+})
+
+async function getResources() {
+  fetchingResources.value = true
+  const { data, pending, error } = await useFetch('https://nginx.slotify.orb.local/api/resources')
+  fetchingResources.value = false
+  testResources.value = data.value
+}
+
 </script>
 
 <template>
@@ -248,7 +262,7 @@ function removeBooking(index: number) {
         <template #content="{ item }">
           <UCard v-if="item.slug === 'choose-a-game'">
             <div class="flex flex-col gap-6">
-              <div v-for="(booking, index) in state.bookings" :key="index" class="bg-gray-50 rounded-lg p-4 space-y-4">
+              <div v-for="(booking, index) in state.bookings" :key="index" class="bg-muted rounded-lg p-4 space-y-4">
                 <div class="flex items-center justify-between">
                   <h3 class="font-medium">Booking {{ index + 1 }}</h3>
                   <div class="flex gap-2">
@@ -260,7 +274,7 @@ function removeBooking(index: number) {
                 <UFormField :label="`Game`" :name="`bookings.${index}.resource`">
                   <URadioGroup
                     v-model="booking.resource"
-                    :ui="{ fieldset: 'sm:flex-col md:flex-row w-full', item: 'w-full bg-white' }"
+                    :ui="{ fieldset: 'sm:flex-col md:flex-row w-full', item: 'w-full bg-neutral-600' }"
                     indicator="hidden"
                     variant="card"
                     :items="resources"
@@ -271,7 +285,7 @@ function removeBooking(index: number) {
                 <UFormField v-if="booking.resource !== 'playstation-5'" :label="`Unit`" :name="`bookings.${index}.resourceUnit`">
                   <URadioGroup
                     v-model="booking.resourceUnit"
-                    :ui="{ fieldset: 'sm:flex-col md:flex-row w-full', item: 'w-full bg-white' }"
+                    :ui="{ fieldset: 'sm:flex-col md:flex-row w-full', item: 'w-full bg-neutral-600' }"
                     indicator="hidden"
                     variant="card"
                     :items="resourcesUnit"
@@ -292,7 +306,7 @@ function removeBooking(index: number) {
                   <UCheckboxGroup
                     color="primary"
                     indicator="hidden"
-                    :ui="{ fieldset: 'sm:flex-col md:flex-row w-full grid grid-cols-5 gap-2', item: 'w-full bg-white' }"
+                    :ui="{ fieldset: 'sm:flex-col md:flex-row w-full grid grid-cols-5 gap-2', item: 'w-full bg-neutral-600' }"
                     v-model="booking.multipleResourceUnit"
                     variant="card"
                     :items="resourcesUnitPlaystation"
@@ -342,7 +356,7 @@ function removeBooking(index: number) {
             <h3 class="font-medium">Summary</h3>
             <div class="flex flex-col md:flex-row gap-4 w-full">
               <div v-if="state.bookings.length === 1 && state.bookings[0].resource !== ''" class="w-full flex flex-col gap-4">
-                <div v-for="(booking, index) in state.bookings" :key="index" class="bg-gray-50 rounded-lg p-4">
+                <div v-for="(booking, index) in state.bookings" :key="index" class="bg-muted rounded-lg p-4">
                   <div class="flex flex-col gap-2">
                     <div class="flex items-center gap-2">
                       <UIcon name="i-lucide-gamepad" />
@@ -365,11 +379,11 @@ function removeBooking(index: number) {
                   </div>
                 </div>
               </div>
-              <div v-else class="w-full flex gap-4 bg-gray-50 p-8 rounded-lg items-center justify-center">
+              <div v-else class="w-full flex gap-4 bg-muted p-8 rounded-lg items-center justify-center">
                 <UIcon name="i-lucide-circle-help" />
                 <p class="text-center">No bookings found</p>
               </div>
-              <div class="bg-gray-50 p-2 md:p-8 flex flex-col gap-4 w-full rounded-lg">
+              <div class="bg-muted p-2 md:p-8 flex flex-col gap-4 w-full rounded-lg">
                 <UFormField label="Name" name="name" class="w-full">
                   <UInput v-model="state.name" class="w-full" />
                 </UFormField>
@@ -383,7 +397,7 @@ function removeBooking(index: number) {
             </div>
 
             <div class="w-full flex justify-end mt-4">
-              <UButton type="submit" color="neutral" icon="i-lucide-rocket" :disabled="state.bookings.length === 1 && state.bookings[0].resource === ''">
+              <UButton type="submit" color="primary" icon="i-lucide-rocket" :disabled="state.bookings.length === 1 && state.bookings[0].resource === ''">
                 Confirm Booking
               </UButton>
             </div>

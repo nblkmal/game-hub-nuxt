@@ -1,2 +1,8 @@
 @import "tailwindcss";
 @import "@nuxt/ui";
+
+@theme {
+    --font-sans: 'Andale Mono', monospace;
+    --font-weight-medium: 800;
+    --font-weight-semibold: 900;
+}

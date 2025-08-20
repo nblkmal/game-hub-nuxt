@@ -1,174 +1,11 @@
 <script setup lang="ts">
 import * as v from 'valibot'
 import type { FormSubmitEvent } from '@nuxt/ui'
-import type { StepperItem } from '@nuxt/ui'
-import type { RadioGroupItem } from '@nuxt/ui'
-import { ref, reactive, shallowRef, watch } from 'vue'
+import type { StepperItem, RadioGroupItem } from '@nuxt/ui'
+import { ref, reactive, shallowRef, watch, onMounted } from 'vue'
 import { CalendarDate, DateFormatter, getLocalTimeZone } from '@internationalized/date'
 
-const df = new DateFormatter('en-US', {
-  dateStyle: 'medium'
-})
-
-const modelValue = shallowRef(new CalendarDate(2022, 1, 10))
-
-const resources = ref<RadioGroupItem[]>([
-  {
-    label: 'Snooker',
-    description: 'This is the first option.',
-    value: 'snooker'
-  },
-  {
-    label: 'PlayStation 5',
-    description: 'This is the first option.',
-    value: 'playstation-5'
-  },
-  {
-    label: 'Xbox Series X',
-    description: 'This is the first option.',
-    value: 'xbox-series-x'
-  },
-  {
-    label: 'Nintendo Switch',
-    description: 'This is the first option.',
-    value: 'nintendo-switch'
-  }
-])
-const resourcesUnit = ref<RadioGroupItem[]>([
-  {
-    label: 'Table 1',
-    value: 'table-1',
-  },
-  {
-    label: 'Table 2',
-    value: 'table-2'
-  },
-  {
-    label: 'Table 3',
-    value: 'table-3'
-  },
-  {
-    label: 'Table 4',
-    value: 'table-4'
-  }
-])
-const resourcesUnitPlaystation = ref<RadioGroupItem[]>([
-  {
-    label: 'Playstation 1',
-    value: 'playstation-1'
-  },
-  {
-      label: 'Playstation 2',
-      value: 'playstation-2'
-    },
-    {
-      label: 'Playstation 3',
-      value: 'playstation-3'
-    },
-    {
-      label: 'Playstation 4',
-      value: 'playstation-4'
-    },
-    {
-      label: 'Playstation 5',
-      value: 'playstation-5',
-      disabled: true
-    },
-    {
-      label: 'Playstation 6',
-      value: 'playstation-6',
-      disabled: true
-    },
-    {
-      label: 'Playstation 7',
-      value: 'playstation-7',
-      disabled: true
-    },
-    {
-      label: 'Playstation 8',
-      value: 'playstation-8',
-      disabled: true
-    },
-    {
-      label: 'Playstation 9',
-      value: 'playstation-9',
-      disabled: true
-    },
-    {
-      label: 'Playstation 10',
-      value: 'playstation-10',
-      disabled: true
-    }
-])
-const items = ref<StepperItem[]>([
-  {
-    slug: 'choose-a-game',
-    title: 'Choose a game',
-    description: 'Choose a game',
-    icon: 'i-lucide-gamepad'
-  },
-  {
-    slug: 'confirm',
-    title: 'Confirm',
-    description: 'Confirm',
-    icon: 'i-lucide-check'
-  }
-])
-
-function generateTimeOptions(startHour = 8, endHour = 17, stepMinutes = 15) {
-  const options: string[] = []
-  for (let hour = startHour; hour <= endHour; hour++) {
-    for (let minute = 0; minute < 60; minute += stepMinutes) {
-      if (hour === endHour && minute > 0) break
-      const h = String(hour).padStart(2, '0')
-      const m = String(minute).padStart(2, '0')
-      options.push(`${h}:${m}`)
-    }
-  }
-  return options
-}
-
-const timeOptions = ref(generateTimeOptions(8, 17, 15))
-
-function toMinutes(time: string): number {
-  const [h, m] = time.split(':').map(Number)
-  if (Number.isNaN(h) || Number.isNaN(m)) return -1
-  return h * 60 + m
-}
-
-function getEndOptions(start: string): string[] {
-  if (!start) return timeOptions.value
-  const startMin = toMinutes(start)
-  return timeOptions.value.filter(t => toMinutes(t) > startMin)
-}
-
-const bookingItemSchema = v.pipe(
-  v.object({
-    resource: v.pipe(v.string(), v.minLength(1, 'Choose a game')),
-    resourceUnit: v.pipe(v.array(v.string()), v.minLength(1, 'Please select at least one unit')),
-    date: v.pipe(v.string(), v.minLength(1, 'Choose a date')),
-    startTime: v.pipe(v.string(), v.minLength(1, 'Choose a start time')),
-    endTime: v.pipe(v.string(), v.minLength(1, 'Choose an end time'))
-  }),
-  v.check(
-    (b) => !b.startTime || !b.endTime || toMinutes(b.endTime) > toMinutes(b.startTime),
-    'End time must be after start time'
-  )
-)
-
-const schema = v.object({
-  name: v.pipe(v.string(), v.minLength(1, 'Name is required')),
-  phone: v.pipe(v.string(), v.minLength(1, 'Phone is required')),
-  email: v.pipe(v.string(), v.email('Invalid email')),
-  bookings: v.pipe(
-    v.array(bookingItemSchema),
-    v.minLength(1, 'Add at least one booking')
-  )
-})
-
-type Schema = v.InferOutput<typeof schema>
-
-type Booking = {
+interface Booking {
   resource: string
   resourceUnit: string[]
   date: string
@@ -176,65 +13,205 @@ type Booking = {
   endTime: string
 }
 
+type Schema = v.InferOutput<typeof schema>
+
+const BUSINESS_HOURS = {
+  start: 8,
+  end: 17,
+  stepMinutes: 15
+} as const
+
+const DATE_FORMATTER = new DateFormatter('en-US', {
+  dateStyle: 'medium'
+})
+
+const modelValue = shallowRef(new CalendarDate(2022, 1, 10))
+
+const gameResources = ref<RadioGroupItem[]>([
+  { label: 'Snooker', description: 'Classic snooker tables', value: 'snooker' },
+  { label: 'PlayStation 5', description: 'Next-gen gaming console', value: 'playstation-5' },
+  { label: 'Xbox Series X', description: 'Microsoft gaming console', value: 'xbox-series-x' },
+  { label: 'Nintendo Switch', description: 'Nintendo gaming console', value: 'nintendo-switch' }
+])
+
+const snookerUnits = ref<RadioGroupItem[]>([
+  { label: 'Table 1', value: 'table-1' },
+  { label: 'Table 2', value: 'table-2' },
+  { label: 'Table 3', value: 'table-3' },
+  { label: 'Table 4', value: 'table-4' }
+])
+
+const playstationUnits = ref<RadioGroupItem[]>([
+  { label: 'PlayStation 1', value: 'playstation-1' },
+  { label: 'PlayStation 2', value: 'playstation-2' },
+  { label: 'PlayStation 3', value: 'playstation-3' },
+  { label: 'PlayStation 4', value: 'playstation-4' },
+  { label: 'PlayStation 5', value: 'playstation-5', disabled: true },
+  { label: 'PlayStation 6', value: 'playstation-6', disabled: true },
+  { label: 'PlayStation 7', value: 'playstation-7', disabled: true },
+  { label: 'PlayStation 8', value: 'playstation-8', disabled: true },
+  { label: 'PlayStation 9', value: 'playstation-9', disabled: true },
+  { label: 'PlayStation 10', value: 'playstation-10', disabled: true }
+])
+
+const stepperItems = ref<StepperItem[]>([
+  {
+    slug: 'choose-a-game',
+    title: 'Choose a game',
+    description: 'Select your preferred game and units',
+    icon: 'i-lucide-gamepad'
+  },
+  {
+    slug: 'confirm',
+    title: 'Confirm',
+    description: 'Review and confirm your booking',
+    icon: 'i-lucide-check'
+  }
+])
+
+function generateTimeOptions(startHour = BUSINESS_HOURS.start, endHour = BUSINESS_HOURS.end, stepMinutes = BUSINESS_HOURS.stepMinutes): string[] {
+  const options: string[] = []
+  
+  for (let hour = startHour; hour <= endHour; hour++) {
+    for (let minute = 0; minute < 60; minute += stepMinutes) {
+      if (hour === endHour && minute > 0) break
+      
+      const formattedHour = String(hour).padStart(2, '0')
+      const formattedMinute = String(minute).padStart(2, '0')
+      options.push(`${formattedHour}:${formattedMinute}`)
+    }
+  }
+  
+  return options
+}
+
+function timeToMinutes(time: string): number {
+  const [hours, minutes] = time.split(':').map(Number)
+  
+  if (Number.isNaN(hours) || Number.isNaN(minutes)) {
+    return -1
+  }
+  
+  return hours * 60 + minutes
+}
+
+function getAvailableEndTimes(startTime: string): string[] {
+  if (!startTime) return timeOptions.value
+  
+  const startMinutes = timeToMinutes(startTime)
+  return timeOptions.value.filter(time => timeToMinutes(time) > startMinutes)
+}
+
+function createEmptyBooking(): Booking {
+  return {
+    resource: '',
+    resourceUnit: [],
+    date: new Date().toISOString().split('T')[0],
+    startTime: '',
+    endTime: ''
+  }
+}
+
+const bookingItemSchema = v.pipe(
+  v.object({
+    resource: v.pipe(v.string(), v.minLength(1, 'Please select a game')),
+    resourceUnit: v.pipe(v.array(v.string()), v.minLength(1, 'Please select at least one unit')),
+    date: v.pipe(v.string(), v.minLength(1, 'Please select a date')),
+    startTime: v.pipe(v.string(), v.minLength(1, 'Please select a start time')),
+    endTime: v.pipe(v.string(), v.minLength(1, 'Please select an end time'))
+  }),
+  v.check(
+    (booking) => {
+      if (!booking.startTime || !booking.endTime) return true
+      return timeToMinutes(booking.endTime) > timeToMinutes(booking.startTime)
+    },
+    'End time must be after start time'
+  )
+)
+
+const schema = v.object({
+  name: v.pipe(v.string(), v.minLength(1, 'Name is required')),
+  phone: v.pipe(v.string(), v.minLength(1, 'Phone is required')),
+  email: v.pipe(v.string(), v.email('Please enter a valid email')),
+  bookings: v.pipe(
+    v.array(bookingItemSchema),
+    v.minLength(1, 'Please add at least one booking')
+  )
+})
+
+const timeOptions = ref(generateTimeOptions())
+
 const state = reactive({
   name: 'akmal',
   phone: '0123456789',
   email: 'akmal@gmail.com',
-  bookings: [
-    { resource: '', resourceUnit: [], date: new Date().toISOString().split('T')[0], startTime: '', endTime: '' } as Booking
-  ],
-  
+  bookings: [createEmptyBooking()]
 })
 
-// Reset unit selections when resource changes
+function getUnitsForResource(resource: string): RadioGroupItem[] {
+  return resource === 'playstation-5' ? playstationUnits.value : snookerUnits.value
+}
+
+function getGridColumns(resource: string): string {
+  return resource === 'playstation-5' ? 'sm:grid-cols-5' : 'sm:grid-cols-4'
+}
+
 watch(
-  () => state.bookings.map(b => b.resource),
+  () => state.bookings.map(booking => booking.resource),
   (newResources, oldResources) => {
     newResources.forEach((resource, index) => {
-      if (!resource) return
-      if (resource !== oldResources?.[index]) {
-        // Reset resourceUnit array when resource changes
-        state.bookings[index].resourceUnit = []
+      if (!resource || resource === oldResources?.[index]) return
+      
+      const booking = state.bookings[index]
+      if (booking) {
+        booking.resourceUnit = []
       }
     })
   }
 )
 
-// Ensure endTime stays after startTime
 watch(
-  () => state.bookings.map(b => b.startTime),
-  (newStarts) => {
-    newStarts.forEach((start, index) => {
+  () => state.bookings.map(booking => booking.startTime),
+  (newStartTimes) => {
+    newStartTimes.forEach((startTime, index) => {
       const booking = state.bookings[index]
-      if (!start) return
-      const validOptions = getEndOptions(start)
-      if (!booking.endTime || toMinutes(booking.endTime) <= toMinutes(start)) {
-        booking.endTime = validOptions[0] || ''
+      if (!startTime || !booking) return
+      
+      const validEndTimes = getAvailableEndTimes(startTime)
+      if (!booking.endTime || timeToMinutes(booking.endTime) <= timeToMinutes(startTime)) {
+        booking.endTime = validEndTimes[0] || ''
       }
     })
   }
 )
 
 const toast = useToast()
-async function onSubmit(event: FormSubmitEvent<Schema>) {
+
+async function handleFormSubmit(event: FormSubmitEvent<Schema>) {
   try {
-    const res = await $fetch('https://nginx.slotify.orb.local/api/bookings', {
+    const response = await $fetch('https://nginx.slotify.orb.local/api/bookings', {
       method: 'POST',
       body: event.data
     })
 
-    console.log('API response:', res)
-    toast.add({ title: 'Booking created', description: 'Booking created successfully', color: 'success' })
-  } catch (err: any) {
-    console.error('API error:', err)
-    toast.add({ title: 'Error', description: err.message, color: 'error' })
+    console.log('Booking created successfully:', response)
+    toast.add({ 
+      title: 'Success', 
+      description: 'Your booking has been created successfully', 
+      color: 'green' 
+    })
+  } catch (error: any) {
+    console.error('Booking creation failed:', error)
+    toast.add({ 
+      title: 'Error', 
+      description: error.message || 'Failed to create booking', 
+      color: 'red' 
+    })
   }
 }
 
-const stepper = useTemplateRef('stepper')
-
 function addBooking() {
-  state.bookings.push({ resource: '', resourceUnit: [], date: new Date().toISOString().split('T')[0], startTime: '', endTime: '' })
+  state.bookings.push(createEmptyBooking())
 }
 
 function removeBooking(index: number) {
@@ -242,26 +219,18 @@ function removeBooking(index: number) {
   state.bookings.splice(index, 1)
 }
 
-const fetchingResources = ref(false)
-const testResources = ref([])
-// onMounted, call api health
-onMounted(() => {
-  getResources()
-})
+const stepper = useTemplateRef('stepper')
 
-async function getResources() {
-  // fetchingResources.value = true
-  // const { data, pending, error } = await useFetch('https://nginx.slotify.orb.local/api/resources')
-  // fetchingResources.value = false
-  // testResources.value = data.value
-}
+onMounted(() => {
+  console.log('Booking component mounted')
+})
 
 </script>
 
 <template>
   <div class="p-5 md:p-40">
-    <UForm :schema="schema" :state="state" class="space-y-4" @submit="onSubmit">
-      <UStepper color="neutral" ref="stepper" :items="items" class="w-full">
+    <UForm :schema="schema" :state="state" class="space-y-4" @submit="handleFormSubmit">
+      <UStepper color="neutral" ref="stepper" :items="stepperItems" class="w-full">
         <template #content="{ item }">
           <UCard v-if="item.slug === 'choose-a-game'">
             <div class="flex flex-col gap-6">
@@ -277,10 +246,10 @@ async function getResources() {
                 <UFormField :label="`Game`" :name="`bookings.${index}.resource`">
                   <URadioGroup
                     v-model="booking.resource"
-                    :ui="{ fieldset: 'sm:flex-col md:flex-row w-full', item: 'w-full bg-neutral-600' }"
+                    :ui="{ fieldset: 'sm:flex-col md:flex-row w-full gap-2', item: 'w-full bg-neutral-600' }"
                     indicator="hidden"
                     variant="card"
-                    :items="resources"
+                    :items="gameResources"
                     class="w-full "
                   />
                 </UFormField>
@@ -290,9 +259,9 @@ async function getResources() {
                     v-model="booking.resourceUnit"
                     color="primary"
                     indicator="hidden"
-                    :ui="{ fieldset: 'sm:flex-col md:flex-row w-full grid grid-cols-5 gap-2', item: 'w-full bg-neutral-600' }"
+                    :ui="{ fieldset: `flex flex-col sm:grid ${getGridColumns(booking.resource)} gap-2`, item: 'w-full bg-neutral-600' }"
                     variant="card"
-                    :items="booking.resource === 'playstation-5' ? resourcesUnitPlaystation : resourcesUnit"
+                    :items="getUnitsForResource(booking.resource)"
                     class="w-full"
                   >
                     <template #label="{ item }">
@@ -310,7 +279,7 @@ async function getResources() {
                   <UFormField :label="`Date`" :name="`bookings.${index}.date`" class="w-full">
                     <UPopover>
                       <UButton color="neutral" variant="subtle" icon="i-lucide-calendar" class="w-full">
-                        {{ modelValue ? df.format(modelValue.toDate(getLocalTimeZone())) : 'Select a date' }}
+                        {{ modelValue ? DATE_FORMATTER.format(modelValue.toDate(getLocalTimeZone())) : 'Select a date' }}
                       </UButton>
 
                       <template #content>
@@ -324,7 +293,7 @@ async function getResources() {
                   </UFormField>
 
                   <UFormField :label="`End time`" :name="`bookings.${index}.endTime`" class="w-full">
-                    <USelect v-model="booking.endTime" :items="getEndOptions(booking.startTime)" placeholder="Select end time" class="w-full"/>
+                    <USelect v-model="booking.endTime" :items="getAvailableEndTimes(booking.startTime)" placeholder="Select end time" class="w-full"/>
                   </UFormField>
                 </div>
               </div>

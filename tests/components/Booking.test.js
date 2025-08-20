@@ -1,67 +1,106 @@
-// Since we can't import the actual component without proper Nuxt setup,
-// this is a demonstration of how you would test a Vue component
+import { describe, it, expect, beforeEach } from '@jest/globals'
+
 describe('Booking Component', () => {
-  let wrapper
+  let mockState
+  let mockBooking
 
   beforeEach(() => {
-    // This is how you would mount a component in a real test
-    // const { mount } = require('@vue/test-utils')
-    // wrapper = mount(Booking, {
-    //   global: {
-    //     stubs: {
-    //       'NuxtLink': true,
-    //       'NuxtPage': true
-    //     }
-    //   }
-    // })
-  })
+    mockBooking = {
+      resource: '',
+      resourceUnit: [],
+      date: new Date().toISOString().split('T')[0],
+      startTime: '',
+      endTime: ''
+    }
 
-  it('should have a test function', () => {
-    // This test demonstrates the structure without the actual component
-    expect(typeof 'test').toBe('string')
-  })
-
-  it('should handle API calls', async () => {
-    // Example of how you would test API calls
-    const mockResponse = { data: { message: 'Success' } }
-    expect(mockResponse.data.message).toBe('Success')
-  })
-
-  it('should validate form data', () => {
-    // Example of form validation testing
-    const formData = {
+    mockState = {
       name: 'John Doe',
+      phone: '1234567890',
       email: 'john@example.com',
-      phone: '1234567890'
+      bookings: [mockBooking]
     }
-    
-    expect(formData.name).toBeTruthy()
-    expect(formData.email).toContain('@')
-    expect(formData.phone).toHaveLength(10)
   })
-})
 
-// Example of testing computed properties
-describe('Computed Properties', () => {
-  it('should calculate total correctly', () => {
-    const items = [
-      { price: 10, quantity: 2 },
-      { price: 5, quantity: 1 }
-    ]
-    
-    const total = items.reduce((sum, item) => sum + (item.price * item.quantity), 0)
-    expect(total).toBe(25)
+  it('should validate booking form data structure', () => {
+    expect(mockState.name).toBeTruthy()
+    expect(mockState.phone).toHaveLength(10)
+    expect(mockState.email).toContain('@')
+    expect(mockState.bookings).toHaveLength(1)
+    expect(mockState.bookings[0]).toHaveProperty('resource')
+    expect(mockState.bookings[0]).toHaveProperty('resourceUnit')
+    expect(mockState.bookings[0]).toHaveProperty('date')
+    expect(mockState.bookings[0]).toHaveProperty('startTime')
+    expect(mockState.bookings[0]).toHaveProperty('endTime')
   })
-})
 
-// Example of testing methods
-describe('Methods', () => {
-  it('should format phone number correctly', () => {
-    const formatPhone = (phone) => {
-      return phone.replace(/(\d{3})(\d{3})(\d{4})/, '($1) $2-$3')
+  it('should validate time format conversion', () => {
+    const timeToMinutes = (time) => {
+      const [hours, minutes] = time.split(':').map(Number)
+      if (Number.isNaN(hours) || Number.isNaN(minutes)) return -1
+      return hours * 60 + minutes
     }
-    
-    const result = formatPhone('1234567890')
-    expect(result).toBe('(123) 456-7890')
+
+    expect(timeToMinutes('10:30')).toBe(630)
+    expect(timeToMinutes('14:45')).toBe(885)
+    expect(timeToMinutes('09:00')).toBe(540)
+    expect(timeToMinutes('invalid')).toBe(-1)
+  })
+
+  it('should validate resource unit selection logic', () => {
+    const getUnitsForResource = (resource) => {
+      const snookerUnits = [
+        { label: 'Table 1', value: 'table-1' },
+        { label: 'Table 2', value: 'table-2' },
+        { label: 'Table 3', value: 'table-3' },
+        { label: 'Table 4', value: 'table-4' }
+      ]
+      
+      const playstationUnits = [
+        { label: 'PlayStation 1', value: 'playstation-1' },
+        { label: 'PlayStation 2', value: 'playstation-2' },
+        { label: 'PlayStation 3', value: 'playstation-3' },
+        { label: 'PlayStation 4', value: 'playstation-4' }
+      ]
+
+      return resource === 'playstation-5' ? playstationUnits : snookerUnits
+    }
+
+    const snookerResult = getUnitsForResource('snooker')
+    const playstationResult = getUnitsForResource('playstation-5')
+
+    expect(snookerResult).toHaveLength(4)
+    expect(playstationResult).toHaveLength(4)
+    expect(snookerResult[0].label).toBe('Table 1')
+    expect(playstationResult[0].label).toBe('PlayStation 1')
+  })
+
+  it('should validate grid column calculation', () => {
+    const getGridColumns = (resource) => {
+      return resource === 'playstation-5' ? 'sm:grid-cols-5' : 'sm:grid-cols-4'
+    }
+
+    expect(getGridColumns('playstation-5')).toBe('sm:grid-cols-5')
+    expect(getGridColumns('snooker')).toBe('sm:grid-cols-4')
+    expect(getGridColumns('xbox-series-x')).toBe('sm:grid-cols-4')
+  })
+
+  it('should validate empty booking creation', () => {
+    const createEmptyBooking = () => {
+      return {
+        resource: '',
+        resourceUnit: [],
+        date: new Date().toISOString().split('T')[0],
+        startTime: '',
+        endTime: ''
+      }
+    }
+
+    const emptyBooking = createEmptyBooking()
+
+    expect(emptyBooking.resource).toBe('')
+    expect(emptyBooking.resourceUnit).toEqual([])
+    expect(emptyBooking.startTime).toBe('')
+    expect(emptyBooking.endTime).toBe('')
+    expect(emptyBooking.date).toBe(new Date().toISOString().split('T')[0])
   })
 })

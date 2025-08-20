@@ -156,6 +156,14 @@ function getGridColumns(resource: string): string {
   return resource === 'playstation-5' ? 'sm:grid-cols-5' : 'sm:grid-cols-4'
 }
 
+function getSelectedUnitValue(booking: Booking): string {
+  return booking.resourceUnit.length > 0 ? booking.resourceUnit[0] : ''
+}
+
+function setSelectedUnitValue(booking: Booking, value: string) {
+  booking.resourceUnit = value ? [value] : []
+}
+
 watch(
   () => state.bookings.map(booking => booking.resource),
   (newResources, oldResources) => {
@@ -256,6 +264,7 @@ onMounted(() => {
 
                 <UFormField :label="`Unit`" :name="`bookings.${index}.resourceUnit`">
                   <UCheckboxGroup
+                    v-if="booking.resource === 'playstation-5'"
                     v-model="booking.resourceUnit"
                     color="primary"
                     indicator="hidden"
@@ -273,6 +282,17 @@ onMounted(() => {
                       </div>
                     </template>
                   </UCheckboxGroup>
+                  <URadioGroup 
+                    v-else 
+                    variant="card" 
+                    indicator="hidden"
+                    :ui="{ fieldset: `flex flex-col sm:grid ${getGridColumns(booking.resource)} gap-2`, item: 'w-full bg-neutral-600' }"
+                    :model-value="getSelectedUnitValue(booking)"
+                    @update:model-value="(value) => setSelectedUnitValue(booking, value)"
+                    :items="getUnitsForResource(booking.resource)" 
+                    placeholder="Select unit" 
+                    class="w-full"
+                  />
                 </UFormField>
 
                 <div class="flex flex-col md:flex-row gap-4">
@@ -298,9 +318,9 @@ onMounted(() => {
                 </div>
               </div>
 
-              <div>
+              <!-- <div>
                 <UButton color="neutral" variant="soft" leading-icon="i-lucide-plus" @click="addBooking">Want to play other games?</UButton>
-              </div>
+              </div> -->
             </div>
           </UCard>
 
